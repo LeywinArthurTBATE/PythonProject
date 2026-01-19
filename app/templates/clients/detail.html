@@ -1,0 +1,398 @@
+<!-- file name: clients/detail.html -->
+{% extends "layout.html" %}
+
+{% block title %}{{ client.full_name }} - Клиент{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ client.full_name }}</h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">ID: {{ client.id }}</p>
+    </div>
+    <div class="flex space-x-3">
+        <a href="/pages/clients" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> Назад к списку
+        </a>
+        {% if user.is_admin %}
+        <button onclick="editClient({{ client.id }})" class="bg-yellow-500 dark:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm hover:bg-yellow-600 dark:hover:bg-yellow-700 transition-colors">
+            <i class="fas fa-edit mr-2"></i> Редактировать
+        </button>
+        <button onclick="deleteClient({{ client.id }})" class="bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700 dark:hover:bg-red-800 transition-colors">
+            <i class="fas fa-trash mr-2"></i> Удалить
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Основная информация -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Информация о клиенте -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Информация о клиенте</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Полное имя</p>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-300">{{ client.full_name }}</p>
+                </div>
+                {% if client.inn %}
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">ИНН</p>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-300">{{ client.inn }}</p>
+                </div>
+                {% endif %}
+                {% if client.funnel %}
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Воронка</p>
+                    <span class="mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {{ client.funnel }}
+                    </span>
+                </div>
+                {% endif %}
+                {% if client.bitrix_id %}
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Bitrix ID</p>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-300">
+                        <a href="https://autorg.bitrix24.ru/crm/deal/details/{{ client.bitrix_id }}/" target="_blank" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors">
+                            <i class="fas fa-external-link-alt mr-1"></i> {{ client.bitrix_id }}
+                        </a>
+                    </p>
+                </div>
+                {% endif %}
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Создан</p>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-300">{{ client.created_at.strftime('%d.%m.%Y %H:%M') if client.created_at else 'Не указано' }}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Обновлен</p>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-300">{{ client.updated_at.strftime('%d.%m.%Y %H:%M') if client.updated_at else 'Не указано' }}</p>
+                </div>
+            </div>
+
+            {% if client.facts %}
+            <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Дополнительная информация</p>
+                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md transition-colors">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ client.facts }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Статистика -->
+        {% if call_stats %}
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Статистика звонков</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Всего звонков</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{{ call_stats.total_calls }}</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Средняя оценка</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                        {% if call_stats.avg_score is not none %}
+                        {{ "%.1f"|format(call_stats.avg_score) }}
+                        {% else %}
+                        <span class="text-gray-400 dark:text-gray-500">—</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Последний звонок</p>
+                    <p class="text-sm text-gray-900 dark:text-gray-300 mt-1">
+                        {% if call_stats.last_call %}
+                        {{ call_stats.last_call.strftime('%d.%m.%Y') }}
+                        {% else %}
+                        <span class="text-gray-400 dark:text-gray-500">Нет</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-colors">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Лучшая оценка</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                        {% if call_stats.max_score is not none %}
+                        {{ call_stats.max_score }}
+                        {% else %}
+                        <span class="text-gray-400 dark:text-gray-500">—</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Боковая панель -->
+    <div class="space-y-6">
+        <!-- Быстрые действия -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Быстрые действия</h2>
+            <div class="space-y-3">
+                {% if client.bitrix_id %}
+                <a href="https://autorg.bitrix24.ru/crm/deal/details/{{ client.bitrix_id }}/" target="_blank" class="block w-full text-center bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 px-4 py-3 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-external-link-alt mr-2"></i> Открыть в Bitrix24
+                </a>
+                {% endif %}
+                <button onclick="copyClientInfo()" class="w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-3 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-copy mr-2"></i> Скопировать информацию
+                </button>
+                <button onclick="showAllCalls()" class="w-full bg-primary-50 dark:bg-dark-900 text-primary-700 dark:text-dark-300 hover:bg-primary-100 dark:hover:bg-dark-800 px-4 py-3 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-phone mr-2"></i> Все звонки клиента
+                </button>
+            </div>
+        </div>
+
+        <!-- Часто используемые МОПы -->
+        {% if top_mops %}
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Частые МОПы</h2>
+            <div class="space-y-3">
+                {% for mop in top_mops %}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-8 w-8 bg-primary-100 dark:bg-dark-800 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user text-primary-600 dark:text-dark-400 text-xs"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ mop.full_name }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ mop.call_count }} звонков</p>
+                        </div>
+                    </div>
+                    <a href="/pages/mops/{{ mop.id }}" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors text-sm">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Последние звонки -->
+{% if recent_calls %}
+<div class="mt-8">
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Последние звонки</h2>
+            <a href="/pages/calls/?client_id={{ client.id }}" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors text-sm font-medium">
+                <i class="fas fa-list mr-1"></i> Все звонки
+            </a>
+        </div>
+        <div class="overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">МОП</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Статус</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Оценка</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Дата</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Действия</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for call in recent_calls %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                            {{ call.id }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900 dark:text-gray-300">
+                                {% if call.mop %}
+                                <a href="/pages/mops/{{ call.mop.id }}" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors">
+                                    {{ call.mop.full_name }}
+                                </a>
+                                {% else %}
+                                Не указан
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set status_colors = {
+                                'transcribing': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                                'transcription_done': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                                'analyzing': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                                'analyzing_done': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                'error': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            } %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ status_colors.get(call.status, 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300') }}">
+                                {{ call.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-300">
+                            {% if call.score is not none %}
+                            <span class="font-medium">{{ call.score }}</span>
+                            {% else %}
+                            <span class="text-gray-400 dark:text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {{ call.created_at.strftime('%d.%m.%Y %H:%M') if call.created_at else '' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="/pages/calls/{{ call.id }}" class="text-primary-600 dark:text-dark-500 hover:text-primary-900 dark:hover:text-dark-400 transition-colors">
+                                <i class="fas fa-eye"></i> Просмотр
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальное окно редактирования -->
+<div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800 transition-colors">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4">Редактировать клиента</h3>
+
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editClientId" value="{{ client.id }}">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">ФИО *</label>
+                    <input type="text" id="editFullName" value="{{ client.full_name }}" required
+                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-primary-500 dark:focus:border-dark-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">ИНН</label>
+                    <input type="text" id="editInn" value="{{ client.inn or '' }}"
+                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-primary-500 dark:focus:border-dark-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bitrix ID</label>
+                    <input type="text" id="editBitrixId" value="{{ client.bitrix_id or '' }}"
+                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-primary-500 dark:focus:border-dark-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Воронка</label>
+                    <input type="text" id="editFunnel" value="{{ client.funnel or '' }}"
+                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-primary-500 dark:focus:border-dark-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Доп. информация</label>
+                    <textarea id="editFacts" rows="3"
+                              class="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-primary-500 dark:focus:border-dark-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{{ client.facts or '' }}</textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeEditModal()"
+                            class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        Отмена
+                    </button>
+                    <button type="submit"
+                            class="bg-primary-600 dark:bg-dark-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 dark:hover:bg-dark-700 transition-colors">
+                        Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Редактирование клиента
+function editClient(clientId) {
+    document.getElementById('editClientId').value = clientId;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = {
+        full_name: document.getElementById('editFullName').value,
+        inn: document.getElementById('editInn').value,
+        bitrix_id: document.getElementById('editBitrixId').value,
+        funnel: document.getElementById('editFunnel').value,
+        facts: document.getElementById('editFacts').value
+    };
+
+    const clientId = document.getElementById('editClientId').value;
+
+    try {
+        const response = await fetch(`/clients/${clientId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData),
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            closeEditModal();
+            window.location.reload();
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка при обновлении');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+});
+
+// Удаление клиента
+async function deleteClient(clientId) {
+    if (!confirm('Удалить этого клиента? Все связанные звонки останутся в системе.')) return;
+
+    try {
+        const response = await fetch(`/clients/${clientId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            window.location.href = '/pages/clients';
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка удаления');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+}
+
+// Вспомогательные функции
+function copyClientInfo() {
+    const info = `Клиент: {{ client.full_name }}
+ИНН: {{ client.inn or 'Не указан' }}
+Воронка: {{ client.funnel or 'Не указана' }}
+Bitrix ID: {{ client.bitrix_id or 'Не указан' }}
+ID в системе: {{ client.id }}`;
+
+    navigator.clipboard.writeText(info).then(() => {
+        alert('Информация скопирована в буфер обмена');
+    });
+}
+
+function showAllCalls() {
+    window.location.href = `/pages/calls/?client_id={{ client.id }}`;
+}
+
+// Закрытие модального окна при клике вне его
+window.onclick = function(event) {
+    const modal = document.getElementById('editModal');
+    if (event.target === modal) {
+        closeEditModal();
+    }
+}
+</script>
+{% endblock %}

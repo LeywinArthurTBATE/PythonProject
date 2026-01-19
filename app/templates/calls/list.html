@@ -1,0 +1,497 @@
+<!-- file name: calls/list.html -->
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Заголовок и кнопки -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Звонки</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Всего: <span id="total-calls">0</span>, Страница <span id="current-page">1</span> из <span id="total-pages">1</span>
+            </p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- Кнопка обновления -->
+            <button onclick="loadCalls()"
+                    class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200">
+                <i class="fas fa-sync-alt text-gray-600 dark:text-gray-400"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Поиск -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Поиск
+                    </label>
+                    <input type="text" id="search-input"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent"
+                           placeholder="Клиент, МОП, сценарий...">
+                </div>
+
+                <!-- Статус -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Статус
+                    </label>
+                    <select id="status-select" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                        <option value="">Все</option>
+                        {% for status_val in initial_data.statuses %}
+                        <option value="{{ status_val }}">{{ status_val }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+
+
+                <!-- МОП -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        МОП
+                    </label>
+                    <select id="mop-select" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                        <option value="">Все МОПы</option>
+                        {% for mop in initial_data.mops_list %}
+                        <option value="{{ mop.id }}">{{ mop.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+              <!-- Сценарий -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Сценарий
+                    </label>
+                    <select id="scenario-select" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                        <option value="">Все сценарии</option>
+                        {% for scenario in initial_data.scenarios_list %}
+                        <option value="{{ scenario.id }}">{{ scenario.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Вторая строка фильтров -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+
+                <!-- Дата от -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Дата от
+                    </label>
+                    <input type="date" id="date-from-input"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                </div>
+
+                <!-- Дата до -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Дата до
+                    </label>
+                    <input type="date" id="date-to-input"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                </div>
+
+                <!-- Количество на странице -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        На странице
+                    </label>
+                    <select id="page-size-select" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent">
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Кнопки фильтров -->
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="resetFilters()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                    Сбросить
+                </button>
+                <button type="button" onclick="loadCalls()"
+                        class="px-4 py-2 bg-primary-500 dark:bg-dark-500 hover:bg-primary-600 dark:hover:bg-dark-600 text-white rounded-lg font-medium transition-colors duration-200">
+                    Применить фильтры
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Загрузчик -->
+    <div id="loader" class="text-center py-8">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+        <p class="mt-4 text-gray-600 dark:text-gray-400">Загрузка данных...</p>
+    </div>
+
+    <!-- Таблица -->
+    <div id="calls-table" class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('duration')">Длительность <span id="sort-duration"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                                    onclick="toggleSort('client')">Клиент <span id="sort-client"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('mop')">МОП <span id="sort-mop"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('scenario')">Сценарий <span id="sort-scenario"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('status')">Статус <span id="sort-status"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('score')">Оценка <span id="sort-score"></span></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider
+         cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                                onclick="toggleSort('created_at')">Дата <span id="sort-created_at"></span></th>
+
+                        {% if user.is_admin %}
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Действия
+                        </th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody id="calls-body" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <!-- Данные будут загружены через JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Сообщение об отсутствии данных -->
+    <div id="no-data" class="hidden text-center py-12 bg-white dark:bg-gray-800 rounded-xl shadow">
+        <i class="fas fa-phone-slash text-4xl mb-4 opacity-50 text-gray-400"></i>
+        <p class="text-lg text-gray-600 dark:text-gray-400">Нет данных о звонках</p>
+        <p class="text-sm mt-2 text-gray-500 dark:text-gray-500">Попробуйте изменить фильтры</p>
+    </div>
+
+    <!-- Пагинация -->
+    <div id="pagination" class="hidden flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+            Показано <span id="shown-from">0</span> - <span id="shown-to">0</span> из <span id="shown-total">0</span>
+        </div>
+        <div class="flex space-x-1" id="pagination-buttons">
+            <!-- Кнопки пагинации будут сгенерированы динамически -->
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let totalPages = 1;
+let totalCalls = 0;
+let pageSize = 25;
+let currentSortField = "created_at";
+let currentSortDirection = "desc";
+const sortIcons = {
+  asc: '↑',
+  desc: '↓',
+  none: ''
+};
+
+function toggleSort(field) {
+  if (currentSortField === field) {
+    currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSortField = field;
+    currentSortDirection = 'asc';
+  }
+
+  loadCalls(1);
+}
+
+function updateSortIcons() {
+  document.querySelectorAll('[id^="sort-"]').forEach(el => {
+    el.textContent = '';
+  });
+
+  const icon = document.getElementById(`sort-${currentSortField}`);
+  if (icon) {
+    icon.textContent = sortIcons[currentSortDirection];
+  }
+}
+
+// Функция загрузки данных
+async function loadCalls(page = 1) {
+    currentPage = page;
+
+    // Показываем загрузчик
+    document.getElementById('loader').classList.remove('hidden');
+    document.getElementById('calls-table').classList.add('hidden');
+    document.getElementById('no-data').classList.add('hidden');
+    document.getElementById('pagination').classList.add('hidden');
+
+    // Собираем параметры фильтрации
+    const params = new URLSearchParams({
+        page: currentPage,
+        size: pageSize,
+        sort_field: currentSortField,
+        sort_direction: currentSortDirection,
+    });
+
+    // Добавляем фильтры
+    const search = document.getElementById('search-input').value;
+    const status = document.getElementById('status-select').value;
+    const mopId = document.getElementById('mop-select').value;
+    const scenarioId = document.getElementById('scenario-select').value;
+    const dateFrom = document.getElementById('date-from-input').value;
+    const dateTo = document.getElementById('date-to-input').value;
+
+    if (search) params.append('search', search);
+    if (status) params.append('status', status);
+    if (mopId) params.append('mop_id', mopId);
+    if (scenarioId) params.append('scenario_id', scenarioId);
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+
+    try {
+        const response = await fetch(`/calls/?${params.toString()}`);
+        if (!response.ok) throw new Error('Ошибка загрузки данных');
+
+        const data = await response.json();
+
+        // Обновляем счетчики
+        totalCalls = data.total;
+        totalPages = data.pages || 1;
+
+        document.getElementById('total-calls').textContent = totalCalls;
+        document.getElementById('current-page').textContent = currentPage;
+        document.getElementById('total-pages').textContent = totalPages;
+
+        // Обновляем таблицу
+        updateTable(data.items);
+        updateSortIcons();
+
+        // Обновляем пагинацию
+        updatePagination();
+
+        // Показываем/скрываем элементы
+        document.getElementById('loader').classList.add('hidden');
+
+        if (data.items.length === 0) {
+            document.getElementById('no-data').classList.remove('hidden');
+        } else {
+            document.getElementById('calls-table').classList.remove('hidden');
+            document.getElementById('pagination').classList.remove('hidden');
+        }
+
+    } catch (error) {
+        console.error('Error loading calls:', error);
+        document.getElementById('loader').classList.add('hidden');
+        alert('Ошибка загрузки данных');
+    }
+}
+
+function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '—';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Функция обновления таблицы
+function updateTable(calls) {
+    const tbody = document.getElementById('calls-body');
+    tbody.innerHTML = '';
+
+    if (calls.length === 0) {
+        return;
+    }
+
+    calls.forEach(call => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150';
+        row.onclick = () => {
+            window.location.href = `/pages/calls/${call.id}`;
+        };
+        row.style.cursor = 'pointer';
+
+        // Форматируем дату
+        const createdAt = new Date(call.created_at);
+        const dateStr = `${createdAt.getDate().toString().padStart(2, '0')}.${(createdAt.getMonth() + 1).toString().padStart(2, '0')}.${createdAt.getFullYear()} ${createdAt.getHours().toString().padStart(2, '0')}:${createdAt.getMinutes().toString().padStart(2, '0')}`;
+
+        // Определяем цвет статуса
+        let statusClass = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        if (call.status === 'done') {
+            statusClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        } else if (call.status === 'error') {
+            statusClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+        }
+
+        // Определяем цвет оценки
+        let scoreClass = 'text-gray-400 dark:text-gray-500';
+        let scoreDisplay = '—';
+        if (call.score !== null) {
+            scoreDisplay = call.score.toFixed(1);
+            if (call.score >= 8) {
+                scoreClass = 'bg-green-500 text-white';
+            } else if (call.score >= 5) {
+                scoreClass = 'bg-yellow-500 text-white';
+            } else {
+                scoreClass = 'bg-red-500 text-white';
+            }
+        }
+
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${formatDuration(call.duration)}
+            </td>
+            <td class="px-6 py-4">
+              <div
+                class="truncate-cell font-medium text-gray-900 dark:text-white"
+                title="${call.client?.full_name || 'N/A'}"
+              >
+                ${call.client?.full_name || 'N/A'}
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <div
+                class="truncate-cell text-sm text-gray-900 dark:text-white"
+                title="${call.mop?.full_name || 'Не указан'}"
+              >
+                ${call.mop?.full_name || 'Не указан'}
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <div
+                class="truncate-cell text-sm text-gray-900 dark:text-white"
+                title="${call.scenario?.name || 'Без сценария'}"
+              >
+                ${call.scenario?.name || 'Без сценария'}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                    ${call.status}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                ${call.score !== null ? `<span class="px-2 py-1 rounded-lg ${scoreClass}">${scoreDisplay}</span>` : '<span class="text-gray-400 dark:text-gray-500">—</span>'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                ${dateStr}
+            </td>
+            {% if user.is_admin %}
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+
+                <button onclick="event.stopPropagation(); deleteCall(${call.id})"
+                        class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
+                    <i class="fas fa-trash"></i>
+                </button>
+
+            </td>
+            {% endif %}
+        `;
+
+        tbody.appendChild(row);
+    });
+
+    // Обновляем счетчики показанных элементов
+    const from = Math.min((currentPage - 1) * pageSize + 1, totalCalls);
+    const to = Math.min(currentPage * pageSize, totalCalls);
+
+    document.getElementById('shown-from').textContent = from;
+    document.getElementById('shown-to').textContent = to;
+    document.getElementById('shown-total').textContent = totalCalls;
+}
+
+// Функция обновления пагинации
+function updatePagination() {
+    const container = document.getElementById('pagination-buttons');
+    container.innerHTML = '';
+
+    if (currentPage > 1) {
+        const prevBtn = document.createElement('a');
+        prevBtn.href = '#';
+        prevBtn.onclick = (e) => { e.preventDefault(); loadCalls(currentPage - 1); };
+        prevBtn.className = 'px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300';
+        prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        container.appendChild(prevBtn);
+    }
+
+    // Вычисляем диапазон страниц для показа
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+
+    for (let p = startPage; p <= endPage; p++) {
+        const pageBtn = document.createElement('a');
+        pageBtn.href = '#';
+        pageBtn.onclick = (e) => { e.preventDefault(); loadCalls(p); };
+        pageBtn.className = `px-3 py-2 rounded-lg ${p === currentPage ? 'bg-primary-500 dark:bg-dark-500 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'}`;
+        pageBtn.textContent = p;
+        container.appendChild(pageBtn);
+    }
+
+    if (currentPage < totalPages) {
+        const nextBtn = document.createElement('a');
+        nextBtn.href = '#';
+        nextBtn.onclick = (e) => { e.preventDefault(); loadCalls(currentPage + 1); };
+        nextBtn.className = 'px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300';
+        nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        container.appendChild(nextBtn);
+    }
+}
+
+// Функция сброса фильтров
+function resetFilters() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('status-select').value = '';
+    document.getElementById('client-select').value = '';
+    document.getElementById('mop-select').value = '';
+    document.getElementById('scenario-select').value = '';
+    document.getElementById('date-from-input').value = '';
+    document.getElementById('date-to-input').value = '';
+    document.getElementById('page-size-select').value = '25';
+    pageSize = 25;
+
+    loadCalls(1);
+}
+
+// Функция удаления звонка
+async function deleteCall(callId) {
+    if (!confirm('Удалить этот звонок?')) return;
+
+    try {
+        const response = await fetch(`/calls/${callId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            loadCalls(currentPage);
+        } else {
+            alert('Ошибка при удалении');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчики событий для динамической фильтрации
+    document.getElementById('page-size-select').addEventListener('change', function() {
+        pageSize = parseInt(this.value);
+        loadCalls(1);
+    });
+
+    // Загружаем данные при загрузке страницы
+    loadCalls(1);
+});
+</script>
+{% endblock %}

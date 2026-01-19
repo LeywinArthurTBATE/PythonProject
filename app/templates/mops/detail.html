@@ -1,0 +1,498 @@
+<!-- file name: mops/detail.html -->
+{% extends "layout.html" %}
+
+{% block title %}{{ mop.full_name }} - МОП{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex justify-between items-start">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate max-w-[60vw]">
+                    {{ mop.full_name }}
+                </h1>
+                <span class="px-2 py-1 text-xs font-semibold rounded-full {% if mop.is_active %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                    {% if mop.is_active %}Активен{% else %}Неактивен{% endif %}
+                </span>
+            </div>
+            {% if mop.work_position %}
+            <p class="text-gray-600 dark:text-gray-400 mt-1">
+                {{ mop.work_position }}
+            </p>
+            {% endif %}
+            <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                ID: {{ mop.external_mop_id }}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/pages/mops" class="inline-flex items-center gap-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200">
+                <i class="fas fa-arrow-left"></i> Назад
+            </a>
+            {% if user.is_admin %}
+            <button onclick="editMop({{ mop.id }})" class="inline-flex items-center gap-2 bg-yellow-500 dark:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-600 dark:hover:bg-yellow-700 transition-all duration-200">
+                <i class="fas fa-edit"></i> Редактировать
+            </button>
+            <button onclick="deleteMop({{ mop.id }})" class="inline-flex items-center gap-2 bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 dark:hover:bg-red-800 transition-all duration-200">
+                <i class="fas fa-trash"></i> Удалить
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Основная информация -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Карточка с фото и основной инфой -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-300 hover:shadow-md">
+            <div class="p-6">
+                <div class="flex items-start gap-6">
+                    {% if mop.photo_url %}
+                    <div class="flex-shrink-0">
+                        <img src="{{ mop.photo_url }}" alt="{{ mop.full_name }}"
+                             class="h-32 w-32 rounded-2xl object-cover border-4 border-white dark:border-gray-800 shadow-lg">
+                    </div>
+                    {% endif %}
+                    <div class="flex-1">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Основная информация</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Имя</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium">{{ mop.first_name }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Фамилия</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium">{{ mop.last_name }}</p>
+                                </div>
+                                {% if mop.second_name %}
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Отчество</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium">{{ mop.second_name }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Email</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium truncate">
+                                        {{ mop.email or 'Не указан' }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Рабочий телефон</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium">{{ mop.work_phone or 'Не указан' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Личный телефон</p>
+                                    <p class="text-sm text-gray-900 dark:text-gray-300 font-medium">{{ mop.personal_mobile or 'Не указан' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика в карточках -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-blue-600 dark:text-blue-400 font-medium">Всего звонков</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{{ call_stats.total_calls|default(0) }}</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                        <i class="fas fa-phone-alt text-blue-600 dark:text-blue-400 text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-blue-500 dark:text-blue-500 mt-3">За всё время</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-5 border border-green-200 dark:border-green-800">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-green-600 dark:text-green-400 font-medium">Средняя оценка</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                            {% if mop.avg_score %}
+                            {{ "%.1f"|format(mop.avg_score) }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="p-3 bg-green-100 dark:bg-green-800 rounded-lg">
+                        <i class="fas fa-star text-green-600 dark:text-green-400 text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-green-500 dark:text-green-500 mt-3">На основе {{ call_stats.rated_calls|default(0) }} оценок</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-5 border border-purple-200 dark:border-purple-800">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-purple-600 dark:text-purple-400 font-medium">Лучший результат</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
+                            {% if call_stats.max_score %}
+                            {{ "%.1f"|format(call_stats.max_score) }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="p-3 bg-purple-100 dark:bg-purple-800 rounded-lg">
+                        <i class="fas fa-trophy text-purple-600 dark:text-purple-400 text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-xs text-purple-500 dark:text-purple-500 mt-3">Максимальная оценка</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Боковая панель -->
+    <div class="space-y-6">
+        <!-- Мета информация -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                <i class="fas fa-info-circle text-gray-400"></i> Мета информация
+            </h3>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Дата создания</span>
+                    <span class="text-sm text-gray-900 dark:text-gray-300 font-medium">
+                        {{ mop.created_at.strftime('%d.%m.%Y') if mop.created_at else '-' }}
+                    </span>
+                </div>
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Последнее обновление</span>
+                    <span class="text-sm text-gray-900 dark:text-gray-300 font-medium">
+                        {{ mop.updated_at.strftime('%d.%m.%Y %H:%M') if mop.updated_at else '-' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Быстрые действия -->
+        {% if user.is_admin %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                <i class="fas fa-bolt text-yellow-500"></i> Быстрые действия
+            </h3>
+            <div class="space-y-2">
+                <button onclick="window.location.href='/pages/calls/?mop_id={{ mop.id }}'"
+                        class="w-full text-left px-4 py-3 rounded-lg text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all duration-200">
+                    <i class="fas fa-history mr-2"></i> Показать все звонки
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Последние звонки -->
+{% if recent_calls %}
+<div class="mt-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Последние звонки</h2>
+                <a href="/pages/calls/?mop_id={{ mop.id }}" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 text-sm font-medium inline-flex items-center gap-1">
+                    <span>Все звонки</span>
+                    <i class="fas fa-arrow-right text-xs"></i>
+                </a>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Клиент</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Статус</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Оценка</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Дата</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for call in recent_calls %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-300">
+                                        {% if call.client %}
+                                        {{ call.client.full_name }}
+                                        {% else %}
+                                        <span class="text-gray-400">Не указан</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-500">
+                                        ID: {{ call.id }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% set status_colors = {
+                                'transcribing': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                                'transcription_done': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                                'analyzing': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                                'done': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                'error': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            } %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ status_colors.get(call.status, 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300') }}">
+                                {{ call.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {% if call.score is not none %}
+                                {% if call.score >= 8 %}
+                                    <span class="px-2 py-1 rounded-lg bg-green-500 text-white font-semibold">
+                                        {{ call.score|round(1) }}
+                                    </span>
+                                {% elif call.score >= 5 %}
+                                    <span class="px-2 py-1 rounded-lg bg-yellow-500 text-white font-semibold">
+                                        {{ call.score|round(1) }}
+                                    </span>
+                                {% else %}
+                                    <span class="px-2 py-1 rounded-lg bg-red-500 text-white font-semibold">
+                                        {{ call.score|round(1) }}
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-gray-400 dark:text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {{ call.created_at.strftime('%d.%m.%Y %H:%M') if call.created_at else '' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                            <a href="/pages/calls/{{ call.id }}" class="inline-flex items-center text-primary-600 dark:text-dark-500 hover:text-primary-900 dark:hover:text-dark-400 transition-colors">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальное окно редактирования -->
+<div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 hidden transition-opacity duration-300">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-2xl rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 scale-95 opacity-0" id="modalContent">
+        <div class="mt-3">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Редактировать МОП</h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editMopId">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Имя</label>
+                        <input type="text" id="editFirstName" required
+                               class="w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all duration-200">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Фамилия</label>
+                        <input type="text" id="editLastName" required
+                               class="w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all duration-200">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="email" id="editEmail"
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all duration-200">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Рабочий телефон</label>
+                    <input type="text" id="editWorkPhone"
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all duration-200">
+                </div>
+
+                <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <input type="checkbox" id="editIsActive"
+                           class="h-4 w-4 text-primary-600 dark:text-dark-500 focus:ring-primary-500 dark:focus:ring-dark-500 border-gray-300 dark:border-gray-600 rounded">
+                    <label for="editIsActive" class="ml-2 text-sm text-gray-700 dark:text-gray-300">Активный статус</label>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-6">
+                    <button type="button" onclick="closeEditModal()"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200">
+                        Отмена
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 dark:bg-dark-600 rounded-lg hover:bg-primary-700 dark:hover:bg-dark-700 transition-all duration-200 shadow-sm">
+                        Сохранить изменения
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Редактирование МОПа
+function editMop(mopId) {
+    document.getElementById('editMopId').value = mopId;
+    document.getElementById('editFirstName').value = '{{ mop.first_name }}';
+    document.getElementById('editLastName').value = '{{ mop.last_name }}';
+    document.getElementById('editEmail').value = '{{ mop.email or "" }}';
+    document.getElementById('editWorkPhone').value = '{{ mop.work_phone or "" }}';
+    document.getElementById('editIsActive').checked = {{ mop.is_active|lower }};
+
+    const modal = document.getElementById('editModal');
+    const modalContent = document.getElementById('modalContent');
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        modalContent.classList.remove('scale-95', 'opacity-0');
+    }, 10);
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('editModal');
+    const modalContent = document.getElementById('modalContent');
+
+    modal.classList.add('opacity-0');
+    modalContent.classList.add('scale-95', 'opacity-0');
+
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300);
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = {
+        first_name: document.getElementById('editFirstName').value.trim(),
+        last_name: document.getElementById('editLastName').value.trim(),
+        email: document.getElementById('editEmail').value.trim(),
+        work_phone: document.getElementById('editWorkPhone').value.trim(),
+        is_active: document.getElementById('editIsActive').checked
+    };
+
+    if (!formData.first_name || !formData.last_name) {
+        alert('Имя и фамилия обязательны для заполнения');
+        return;
+    }
+
+    const mopId = document.getElementById('editMopId').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Сохранение...';
+
+    try {
+        const response = await fetch(`/mops/${mopId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData),
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            closeEditModal();
+            window.location.reload();
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка при обновлении');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+});
+
+// Удаление МОПа
+async function deleteMop(mopId) {
+    if (!confirm('Вы уверены, что хотите удалить этого МОПа? Это действие нельзя отменить.')) return;
+
+    try {
+        const response = await fetch(`/mops/${mopId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            window.location.href = '/pages/mops';
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка удаления');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+}
+
+// Изменение активности
+async function toggleActive(mopId, newStatus) {
+    if (!confirm(`Вы уверены, что хотите ${newStatus ? 'активировать' : 'деактивировать'} этого МОПа?`)) return;
+
+    try {
+        const response = await fetch(`/mops/${mopId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ is_active: newStatus }),
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка при изменении статуса');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+}
+
+// Закрытие модального окна
+window.onclick = function(event) {
+    const modal = document.getElementById('editModal');
+    if (event.target === modal) {
+        closeEditModal();
+    }
+}
+
+// Анимация при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.bg-white, .bg-gradient-to-br');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, 100 * index);
+    });
+});
+</script>
+{% endblock %}

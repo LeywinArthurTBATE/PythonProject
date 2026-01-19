@@ -1,0 +1,1037 @@
+<!-- file name: calls/detail.html -->
+{% extends "layout.html" %}
+
+{% block title %}Звонок #{{ call.id }}{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Звонок #{{ call.id }}</h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">
+            {% if call.created_at %}
+            Создан: {{ call.created_at.strftime('%d.%m.%Y %H:%M') }}
+            {% endif %}
+            {% if call.updated_at %}
+            • Обновлен: {{ call.updated_at.strftime('%d.%m.%Y %H:%M') }}
+            {% endif %}
+        </p>
+    </div>
+    <div class="flex space-x-3">
+        <a href="/" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i> Назад
+        </a>
+        {% if user and user.is_admin %}
+        <button id="btnRetranscribe"
+                class="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors flex items-center">
+          <i class="fas fa-redo mr-2"></i> Ретранскрибация
+        </button>
+
+        <button id="btnReanalyze"
+                class="bg-purple-600 dark:bg-purple-700 text-white px-4 py-2 rounded-md text-sm hover:bg-purple-700 dark:hover:bg-purple-800 transition-colors flex items-center">
+          <i class="fas fa-brain mr-2"></i> Реанализ
+        </button>
+        {% endif %}
+        {% if call.result_text %}
+        <a href="/calls/{{ call.id }}/transcription" class="bg-primary-600 dark:bg-dark-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 dark:hover:bg-dark-700 transition-colors flex items-center">
+            <i class="fas fa-download mr-2"></i> Транскрипция
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+    <div class="xl:col-span-3 space-y-6">
+        <!-- Статус и основная информация -->
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Информация о звонке</h2>
+                {% if call.call_id_bitrix %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <i class="fas fa-phone-alt mr-1"></i> Bitrix ID: {{ call.call_id_bitrix }}
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Статус -->
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Статус</label>
+                    {% set status_config = {
+                        'new': {'color': 'gray', 'icon': 'fa-clock'},
+                        'transcribing': {'color': 'blue', 'icon': 'fa-microphone'},
+                        'transcription_done': {'color': 'yellow', 'icon': 'fa-check-circle'},
+                        'analyzing': {'color': 'purple', 'icon': 'fa-brain'},
+                        'analyzing_done': {'color': 'green', 'icon': 'fa-chart-line'},
+                        'analyzing_error': {'color': 'red', 'icon': 'fa-exclamation-triangle'},
+                        'transcription_error': {'color': 'red', 'icon': 'fa-exclamation-triangle'}
+                    } %}
+                    {% set status_info = status_config.get(call.status, {'color': 'gray', 'icon': 'fa-question-circle'}) %}
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-lg bg-{{ status_info.color }}-100 dark:bg-{{ status_info.color }}-900/30 mr-3">
+                            <i class="fas {{ status_info.icon }} text-{{ status_info.color }}-600 dark:text-{{ status_info.color }}-400"></i>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100 capitalize">
+                                {{ call.status.replace('_', ' ') }}
+                            </span>
+                            {% if call.transcribe_attempts > 0 %}
+                            <span class="text-xs text-gray-500">Попыток: {{ call.transcribe_attempts }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Оценка -->
+                {% if call.score is not none %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Оценка</label>
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 mr-3">
+                            <i class="fas fa-star text-green-600 dark:text-green-400"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                    {{ call.score|round(1) }}/10
+                                </span>
+                                <span class="text-xs text-gray-500">{{ (call.score * 10)|round(1) }}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full" style="width: {{ call.score * 10 }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Длительность -->
+                {% if call.duration %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Длительность</label>
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 mr-3">
+                            <i class="fas fa-clock text-indigo-600 dark:text-indigo-400"></i>
+                        </div>
+                        <div>
+                            <span class="block text-lg font-bold text-gray-900 dark:text-gray-100">
+                                {{ call.duration }} сек
+                            </span>
+                            <span class="text-xs text-gray-500">{{ (call.duration / 60)|round(1) }} мин</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Время анализа -->
+                {% if call.analyzed_at %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Анализ завершен</label>
+                    <div class="flex items-center">
+                        <div class="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 mr-3">
+                            <i class="fas fa-check-circle text-purple-600 dark:text-purple-400"></i>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {{ call.analyzed_at.strftime('%d.%m.%Y') }}
+                            </span>
+                            <span class="text-xs text-gray-500">{{ call.analyzed_at.strftime('%H:%M') }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Время начала транскрипции -->
+                {% if call.transcribe_started_at %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Начало транскрипции</label>
+                    <div class="text-sm text-gray-900 dark:text-gray-300">
+                        {{ call.transcribe_started_at.strftime('%d.%m.%Y %H:%M') }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Время окончания транскрипции -->
+                {% if call.transcribe_finished_at %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Конец транскрипции</label>
+                    <div class="text-sm text-gray-900 dark:text-gray-300">
+                        {{ call.transcribe_finished_at.strftime('%d.%m.%Y %H:%M') }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Сценарий -->
+        {% if call.scenario %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 mr-3">
+                    <i class="fas fa-scroll text-indigo-600 dark:text-indigo-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Сценарий звонка</h2>
+            </div>
+
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Название</label>
+                        <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ call.scenario.name }}</p>
+                    </div>
+
+                    {% if call.scenario.code %}
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Код сценария</label>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            {{ call.scenario.code }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if call.scenario.description %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Описание</label>
+                    <p class="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                        {{ call.scenario.description }}
+                    </p>
+                </div>
+                {% endif %}
+
+                {% if call.scenario.version %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-gray-600 dark:text-gray-400">Версия</label>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        <i class="fas fa-code-branch mr-1"></i> v{{ call.scenario.version }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Аудио и субтитры -->
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 mr-3">
+                    <i class="fas fa-play-circle text-blue-600 dark:text-blue-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Прослушивание</h2>
+            </div>
+
+            {% if call.bitrix_audio_url %}
+            <div class="mb-6">
+                <audio id="callAudio" controls class="w-full rounded-lg">
+                    <source src="{{ call.bitrix_audio_url }}" type="audio/mpeg">
+                </audio>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Субтитры -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-closed-captioning text-gray-600 dark:text-gray-400 mr-2"></i>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Субтитры</p>
+                        </div>
+                        <button id="toggleAutoScroll" type="button"
+                                class="text-xs px-3 py-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center">
+                          <i class="fas fa-scroll mr-1.5"></i>
+                          <span>Автоскролл: ВКЛ</span>
+                        </button>
+                        <a href="/calls/{{ call.id }}/transcription"
+                                class="text-xs px-3 py-1.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center">
+                            Скачать
+                        </a>
+                    </div>
+                    <div id="subsList" class="max-h-96 overflow-y-auto space-y-2 pr-2 custom-scrollbar"></div>
+                </div>
+
+                <!-- Текущая реплика -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-comment-dots text-blue-600 dark:text-blue-400 mr-2"></i>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Текущая реплика</p>
+                    </div>
+                    <div id="currentLine" class="text-sm text-gray-800 dark:text-gray-300 whitespace-pre-wrap bg-white/50 dark:bg-gray-800/50 p-4 rounded-lg min-h-32"></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-volume-mute text-4xl text-gray-400 mb-4"></i>
+                <p class="text-lg text-gray-600 dark:text-gray-400">Аудио недоступно</p>
+                <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">Ссылка на аудио (bitrix_audio_url) отсутствует</p>
+            </div>
+            {% endif %}
+        </div>
+        <!-- Анализ ИИ -->
+        {% if call.analysis_json %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-6">
+                <div class="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30 mr-3">
+                    <i class="fas fa-robot text-orange-600 dark:text-orange-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Анализ искусственного интеллекта</h2>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Общий вывод -->
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/10 p-5 rounded-xl border border-orange-200 dark:border-orange-800">
+                    <div class="flex items-center mb-3">
+                        <i class="fas fa-chart-line text-orange-600 dark:text-orange-400 mr-2"></i>
+                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Общий вывод</h3>
+                    </div>
+                    <div class="text-sm text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-gray-800/50 p-4 rounded-lg">
+                        {{ call.analysis_json.get('overall_analysis','Анализ отсутствует') }}
+                    </div>
+                </div>
+
+                <!-- Рекомендации -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 p-5 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <div class="flex items-center mb-3">
+                        <i class="fas fa-lightbulb text-blue-600 dark:text-blue-400 mr-2"></i>
+                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Рекомендации менеджеру</h3>
+                    </div>
+                    <ul class="space-y-2">
+                        {% for r in call.analysis_json.get('manager_recommendations', []) %}
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 text-sm"></i>
+                            <span class="text-sm text-gray-700 dark:text-gray-300">{{ r }}</span>
+                        </li>
+                        {% else %}
+                        <li class="text-sm text-gray-500 dark:text-gray-400">Рекомендации отсутствуют</li>
+                        {% endfor %}
+                    </ul>
+
+                    <div class="mt-6 pt-4 border-t border-blue-200 dark:border-blue-800">
+                        <div class="flex items-center mb-3">
+                            <i class="fas fa-forward text-purple-600 dark:text-purple-400 mr-2"></i>
+                            <h3 class="font-semibold text-gray-900 dark:text-gray-100">Следующий шаг</h3>
+                        </div>
+                        <ul class="space-y-2">
+                            {% for r in call.analysis_json.get('next_step_recommendations', []) %}
+                            <li class="flex items-start">
+                                <i class="fas fa-arrow-right text-purple-500 mt-1 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ r }}</span>
+                            </li>
+                            {% else %}
+                            <li class="text-sm text-gray-500 dark:text-gray-400">Рекомендации отсутствуют</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% set client_type = call.analysis_json.get('client_type') %}
+{% set objections = call.analysis_json.get('objections_map', []) %}
+
+{% if client_type or objections %}
+<div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    {# --- Тип клиента --- #}
+    {% if client_type %}
+    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-900/10
+                p-4 rounded-xl border border-indigo-200 dark:border-indigo-800">
+        <div class="flex items-center mb-2">
+            <i class="fas fa-user-tag text-indigo-600 dark:text-indigo-400 mr-2"></i>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Тип клиента
+            </h3>
+        </div>
+        <span class="inline-flex items-center px-3 py-1 rounded-full
+                     bg-indigo-100 text-indigo-800
+                     dark:bg-indigo-900 dark:text-indigo-200
+                     text-sm font-medium">
+            {{ client_type }}
+        </span>
+    </div>
+    {% endif %}
+
+    {# --- Карта возражений --- #}
+    {% if objections %}
+    <div class="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10
+                p-4 rounded-xl border border-red-200 dark:border-red-800">
+        <div class="flex items-center mb-2">
+            <i class="fas fa-exclamation-circle text-red-600 dark:text-red-400 mr-2"></i>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Карта возражений
+            </h3>
+        </div>
+        <ul class="space-y-1">
+            {% for o in objections %}
+            <li class="flex items-start text-sm text-gray-700 dark:text-gray-300">
+                <i class="fas fa-minus-circle text-red-500 mt-1 mr-2 text-xs"></i>
+                <span>{{ o }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
+
+            </div>
+        </div>
+        {% endif %}
+        <!-- Критерии оценки -->
+        {% if call.analysis_json and call.analysis_json.criteria_scores %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-6">
+                <div class="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 mr-3">
+                    <i class="fas fa-check-circle text-purple-600 dark:text-purple-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Критерии оценки</h2>
+                <span class="ml-auto text-sm font-semibold text-gray-600 dark:text-gray-400">
+                    Средняя оценка: <span class="text-green-600 dark:text-green-400">{{ call.score|round(1) }}/10</span>
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+                {% for item in call.analysis_json.criteria_scores %}
+                {% set criterion = criteria_map.get(item.criterion_id) %}
+                {% if criterion %}
+                <div class="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-5 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="font-bold text-gray-900 dark:text-gray-100">{{ criterion.title }}</h3>
+                            {% if criterion.category %}
+                            <span class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                                {{ criterion.category.name }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <!-- Оценка с цветовой индикацией -->
+                        {% set score_color = 'green' if item.score >= 8 else 'yellow' if item.score >= 5 else 'red' %}
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-{{ score_color }}-600 dark:text-{{ score_color }}-400">
+                                {{ item.score|round(1) }}
+                            </div>
+                            <div class="text-xs text-gray-500">из {{ criterion.max_score|default(10) }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Прогресс бар -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            <span>0</span>
+                            <span>{{ criterion.max_score|default(10) }}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="bg-{{ score_color }}-500 h-2 rounded-full"
+                                 style="width: {{ (item.score / criterion.max_score|default(10) * 100)|round(0) }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Обоснование оценки -->
+                    {% if item.reason %}
+                    <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Обоснование:</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ item.reason }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Пример (если есть) -->
+                    {% if criterion.example %}
+                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Пример:</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 italic">{{ criterion.example }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+
+    </div>
+
+    <!-- Боковая панель с участниками -->
+    <div class="space-y-6">
+        <!-- Клиент -->
+        {% if call.client %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 mr-3">
+                    <i class="fas fa-user-tie text-green-600 dark:text-green-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Клиент</h2>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex items-center">
+                    <i class="fas fa-id-card text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">ФИО</p>
+                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ call.client.full_name }}</p>
+                    </div>
+                </div>
+
+                {% if call.client.inn %}
+                <div class="flex items-center">
+                    <i class="fas fa-fingerprint text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">ИНН</p>
+                        <p class="font-mono text-gray-900 dark:text-gray-100">{{ call.client.inn }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.client.funnel %}
+                <div class="flex items-center">
+                    <i class="fas fa-filter text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Воронка</p>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {{ call.client.funnel }}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.client.facts %}
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Дополнительные данные:</p>
+                    <div class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                        {% for key, value in call.client.facts.items() %}
+                        <div class="mb-1"><span class="font-medium">{{ key }}:</span> {{ value }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {% if call.client.bitrix_id %}
+                    <a href="https://autorg.bitrix24.ru/crm/deal/details/{{ call.client.bitrix_id }}/"
+                       target="_blank"
+                       class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm transition-colors">
+                        <i class="fas fa-external-link-alt mr-2"></i> Bitrix
+                    </a>
+                    {% endif %}
+                    <a href="/pages/clients/{{ call.client.id }}"
+                       class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm transition-colors">
+                        <i class="fas fa-info-circle mr-2"></i> Подробнее
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- МОП -->
+        {% if call.mop %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 mr-3">
+                    <i class="fas fa-user-cog text-blue-600 dark:text-blue-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Менеджер по продажам</h2>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex items-center">
+                    <i class="fas fa-user text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">ФИО</p>
+                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ call.mop.full_name }}</p>
+                    </div>
+                </div>
+
+                {% if call.mop.email %}
+                <div class="flex items-center">
+                    <i class="fas fa-envelope text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                        <a href="mailto:{{ call.mop.email }}" class="text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ call.mop.email }}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.mop.work_position %}
+                <div class="flex items-center">
+                    <i class="fas fa-briefcase text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Должность</p>
+                        <p class="text-gray-900 dark:text-gray-100">{{ call.mop.work_position }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.mop.avg_score is not none %}
+                <div class="flex items-center">
+                    <i class="fas fa-star text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Средняя оценка</p>
+                        <div class="flex items-center">
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: {{ call.mop.avg_score * 10 }}%"></div>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                {{ call.mop.avg_score|round(1) }}/10
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.mop.done_calls_count > 0 %}
+                <div class="flex items-center">
+                    <i class="fas fa-phone-alt text-gray-400 w-5 mr-3"></i>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Проанализировано звонков</p>
+                        <p class="font-semibold text-gray-900 dark:text-gray-100">{{ call.mop.done_calls_count }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if call.mop.is_active %}
+                <div class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                    <i class="fas fa-check-circle mr-1.5"></i> Активен
+                </div>
+                {% else %}
+                <div class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                    <i class="fas fa-times-circle mr-1.5"></i> Неактивен
+                </div>
+                {% endif %}
+
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <a href="/pages/mops/{{ call.mop.id }}"
+                       class="w-full inline-flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm transition-colors">
+                        <i class="fas fa-chart-line mr-2"></i> Статистика МОП
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Внешние идентификаторы -->
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-gray-100 dark:bg-gray-900/30 mr-3">
+                    <i class="fas fa-key text-gray-600 dark:text-gray-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Идентификаторы</h2>
+            </div>
+
+            <div class="space-y-3">
+                {% if call.external_mop_id %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-user-secret text-gray-400 mr-2"></i>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">External MOP ID</span>
+                    </div>
+                    <code class="text-xs font-mono text-gray-900 dark:text-gray-100">{{ call.external_mop_id }}</code>
+                </div>
+                {% endif %}
+
+                {% if call.external_client_id %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-users text-gray-400 mr-2"></i>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">External Client ID</span>
+                    </div>
+                    <code class="text-xs font-mono text-gray-900 dark:text-gray-100">{{ call.external_client_id }}</code>
+                </div>
+                {% endif %}
+
+                {% if call.client and call.client.bitrix_id %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-cube text-gray-400 mr-2"></i>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Bitrix Client ID</span>
+                    </div>
+                    <code class="text-xs font-mono text-gray-900 dark:text-gray-100">{{ call.client.bitrix_id }}</code>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Действия -->
+        {% if user and user.is_admin %}
+        <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center mb-4">
+                <div class="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 mr-3">
+                    <i class="fas fa-cog text-red-600 dark:text-red-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Административные действия</h2>
+            </div>
+
+            <div class="space-y-3">
+                <button id="btnRetranscribeSidebar"
+                        class="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors">
+                    <i class="fas fa-redo mr-2"></i> Перезапустить транскрипцию
+                </button>
+
+                <button id="btnReanalyzeSidebar"
+                        class="w-full flex items-center justify-center px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
+                    <i class="fas fa-brain mr-2"></i> Перезапустить анализ
+                </button>
+
+                {% if call.error_message %}
+                <div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div class="flex items-center mb-2">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 mr-2"></i>
+                        <span class="font-medium text-red-800 dark:text-red-300">Ошибка:</span>
+                    </div>
+                    <p class="text-sm text-red-700 dark:text-red-400">{{ call.error_message }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Анимации для активных элементов */
+@keyframes pulse-subtitle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.active-subtitle {
+    animation: pulse-subtitle 2s infinite;
+    border-left: 3px solid #3b82f6 !important;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const audio = document.getElementById("callAudio");
+  const subsList = document.getElementById("subsList");
+  const currentLine = document.getElementById("currentLine");
+  const toggleAutoScroll = document.getElementById("toggleAutoScroll");
+
+  if (!subsList || !currentLine) return;
+
+  // ====== UI state ======
+  let autoScroll = true;
+  if (toggleAutoScroll) {
+    toggleAutoScroll.addEventListener("click", () => {
+      autoScroll = !autoScroll;
+      toggleAutoScroll.innerHTML = `<i class="fas fa-scroll mr-1.5"></i><span>Автоскролл: ${autoScroll ? "ВКЛ" : "ВЫКЛ"}</span>`;
+      toggleAutoScroll.classList.toggle('bg-green-100', autoScroll);
+      toggleAutoScroll.classList.toggle('text-green-800', autoScroll);
+      toggleAutoScroll.classList.toggle('dark:bg-green-900', autoScroll);
+      toggleAutoScroll.classList.toggle('dark:text-green-200', autoScroll);
+    });
+  }
+
+  // ====== 1) ДАННЫЕ СЕГМЕНТОВ ======
+  const rawSegments = {{ (call.result_json or []) | tojson }};
+
+  if (!Array.isArray(rawSegments) || rawSegments.length === 0) {
+    subsList.innerHTML = `
+      <div class="text-center py-8">
+        <i class="fas fa-comment-slash text-2xl text-gray-400 mb-3"></i>
+        <p class="text-sm text-gray-500">Нет данных транскрипции</p>
+        <p class="text-xs text-gray-400 mt-1">(result_json пустой или отсутствует)</p>
+      </div>`;
+    currentLine.textContent = "";
+    return;
+  }
+
+  // ====== 2) НОРМАЛИЗАЦИЯ + СОРТИРОВКА ======
+  const segments = rawSegments
+    .map((s, idx) => {
+      const start = Number(s?.start);
+      const end = Number(s?.end);
+      const text = String(s?.text ?? "").trim();
+      const speaker = String(s?.speaker ?? "");
+
+      const st = Number.isFinite(start) ? start : 0;
+      const en = Number.isFinite(end) ? end : st;
+
+      return {
+        _idx: idx,
+        start: Math.max(0, st),
+        end: Math.max(0, en),
+        text,
+        speaker,
+      };
+    })
+    .filter(s => s.text.length > 0)
+    .sort((a, b) => (a.start - b.start) || (a.end - b.end) || (a._idx - b._idx));
+
+  // ====== 3) РЕНДЕР СУБТИТРОВ ======
+  subsList.innerHTML = "";
+  const nodes = new Array(segments.length);
+
+  segments.forEach((seg, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = [
+      "w-full text-left p-3 rounded-lg mb-2",
+      "border border-gray-200 dark:border-gray-700",
+      "hover:border-blue-300 hover:bg-blue-50",
+      "dark:hover:border-blue-700 dark:hover:bg-blue-900/20",
+      "transition-all duration-200",
+      "group"
+    ].join(" ");
+    btn.dataset.i = String(i);
+    btn.dataset.start = String(seg.start);
+    btn.dataset.end = String(seg.end);
+
+    const header = document.createElement("div");
+    header.className = "flex items-center justify-between mb-2";
+
+    const meta = document.createElement("div");
+    meta.className = "flex items-center space-x-3";
+
+    // Иконка говорящего
+    const speakerIcon = document.createElement("i");
+    speakerIcon.className = seg.speaker === "МОП" || seg.speaker === "MANAGER"
+      ? "fas fa-user-tie text-blue-500"
+      : "fas fa-user text-green-500";
+
+    // Время
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "text-xs font-mono text-gray-500 dark:text-gray-400";
+    timeSpan.textContent = `${fmtTime(seg.start)} → ${fmtTime(seg.end)}`;
+
+    // Спикер
+    if (seg.speaker) {
+      const speakerSpan = document.createElement("span");
+      speakerSpan.className = "text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
+      speakerSpan.textContent = seg.speaker;
+      meta.appendChild(speakerSpan);
+    }
+
+    meta.prepend(timeSpan);
+    meta.prepend(speakerIcon);
+
+    // Индикатор проигрывания
+    const playIndicator = document.createElement("div");
+    playIndicator.className = "opacity-0 group-hover:opacity-100 transition-opacity";
+    playIndicator.innerHTML = '<i class="fas fa-play text-blue-500"></i>';
+
+    header.appendChild(meta);
+    header.appendChild(playIndicator);
+
+    // Текст реплики
+    const txt = document.createElement("div");
+    txt.className = "text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed";
+    txt.textContent = seg.text;
+
+    btn.appendChild(header);
+    btn.appendChild(txt);
+
+    btn.addEventListener("click", () => {
+      if (!audio) return;
+      audio.currentTime = seg.start;
+      audio.play().catch(() => {});
+    });
+
+    subsList.appendChild(btn);
+    nodes[i] = btn;
+  });
+
+  // ====== 4) АКТИВНАЯ СТРОКА + АВТОСКРОЛЛ ======
+  let activeIndex = -1;
+
+  function setActive(i) {
+    if (i === activeIndex) return;
+
+    // Убираем активный класс со старого элемента
+    if (activeIndex >= 0 && nodes[activeIndex]) {
+      nodes[activeIndex].classList.remove(
+        'bg-blue-50', 'border-blue-300', 'dark:bg-blue-900/30', 'dark:border-blue-700',
+        'active-subtitle'
+      );
+    }
+
+    activeIndex = i;
+
+    // Добавляем активный класс новому элементу
+    if (nodes[i]) {
+      nodes[i].classList.add(
+        'bg-blue-50', 'border-blue-300', 'dark:bg-blue-900/30', 'dark:border-blue-700',
+        'active-subtitle'
+      );
+    }
+
+    currentLine.textContent = segments[i]?.text ?? "";
+
+    if (autoScroll && nodes[i]) {
+      nodes[i].scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }
+
+  // ====== 5) ПОИСК СЕГМЕНТА ПО currentTime ======
+  function findIndexByTime(t) {
+    let lo = 0;
+    let hi = segments.length - 1;
+
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const s = segments[mid];
+
+      if (t < s.start) {
+        hi = mid - 1;
+      } else if (t > s.end) {
+        lo = mid + 1;
+      } else {
+        return mid;
+      }
+    }
+
+    const idx = Math.max(0, Math.min(segments.length - 1, lo));
+    return idx;
+  }
+
+  if (audio) {
+    audio.addEventListener("loadedmetadata", () => {
+      setActive(findIndexByTime(audio.currentTime || 0));
+    });
+
+    audio.addEventListener("timeupdate", () => {
+      const idx = findIndexByTime(audio.currentTime);
+      setActive(idx);
+    });
+
+    audio.addEventListener("seeked", () => {
+      const idx = findIndexByTime(audio.currentTime);
+      setActive(idx);
+    });
+  } else {
+    setActive(0);
+  }
+
+  // ====== helpers ======
+  function fmtTime(sec) {
+    sec = Number(sec);
+    if (!Number.isFinite(sec) || sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+})();
+</script>
+
+<script>
+  async function postAction(url, confirmText) {
+    if (!confirm(confirmText)) return;
+
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Accept": "application/json" }
+    });
+
+    if (res.ok) {
+      showNotification('Действие успешно выполнено! Страница будет перезагружена...', 'success');
+      setTimeout(() => window.location.reload(), 1500);
+      return;
+    }
+
+    let payload = null;
+    try { payload = await res.json(); } catch (e) {}
+    const message = (payload && (payload.detail || payload.message)) || `Ошибка: ${res.status}`;
+    showNotification(message, 'error');
+  }
+
+  function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 ${
+      type === 'success' ? 'bg-green-100 border-green-400 text-green-800' :
+      type === 'error' ? 'bg-red-100 border-red-400 text-red-800' :
+      'bg-blue-100 border-blue-400 text-blue-800'
+    } border`;
+    notification.innerHTML = `
+      <div class="flex items-center">
+        <i class="fas ${
+          type === 'success' ? 'fa-check-circle' :
+          type === 'error' ? 'fa-exclamation-circle' :
+          'fa-info-circle'
+        } mr-3"></i>
+        <span>${message}</span>
+      </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100%)';
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  }
+
+  const callId = {{ call.id }};
+
+  // Обработчики для кнопок в шапке
+  const btnRetranscribe = document.getElementById("btnRetranscribe");
+  if (btnRetranscribe) {
+    btnRetranscribe.addEventListener("click", () =>
+      postAction(`/calls/${callId}/retranscribe`, "Перезапустить транскрипцию этого звонка? Текущие результаты будут удалены.")
+    );
+  }
+
+  const btnReanalyze = document.getElementById("btnReanalyze");
+  if (btnReanalyze) {
+    btnReanalyze.addEventListener("click", () =>
+      postAction(`/calls/${callId}/reanalyze`, "Перезапустить анализ звонка? Текущий анализ будет удален.")
+    );
+  }
+
+  // Обработчики для кнопок в сайдбаре
+  const btnRetranscribeSidebar = document.getElementById("btnRetranscribeSidebar");
+  if (btnRetranscribeSidebar) {
+    btnRetranscribeSidebar.addEventListener("click", () =>
+      postAction(`/calls/${callId}/retranscribe`, "Перезапустить транскрипцию этого звонка? Текущие результаты будут удалены.")
+    );
+  }
+
+  const btnReanalyzeSidebar = document.getElementById("btnReanalyzeSidebar");
+  if (btnReanalyzeSidebar) {
+    btnReanalyzeSidebar.addEventListener("click", () =>
+      postAction(`/calls/${callId}/reanalyze`, "Перезапустить анализ звонка? Текущий анализ будет удален.")
+    );
+  }
+
+  // Добавляем стили для красивого скролла
+  const style = document.createElement('style');
+  style.textContent = `
+    .active-subtitle {
+      animation: pulse-subtitle 2s infinite;
+      border-left: 3px solid #3b82f6 !important;
+    }
+  `;
+  document.head.appendChild(style);
+</script>
+{% endblock %}

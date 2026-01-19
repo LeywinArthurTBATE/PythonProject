@@ -1,0 +1,309 @@
+<!-- file name: scenarios/edit.html -->
+{% extends "layout.html" %}
+
+{% block title %}Редактирование: {{ scenario.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .prompt-editor {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/pages/scenarios" class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors mb-4 inline-block">
+        <i class="fas fa-arrow-left mr-2"></i> Назад к списку
+    </a>
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ scenario.name }}</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">Код: <span class="font-mono">{{ scenario.code }}</span></p>
+        </div>
+        <div class="flex space-x-2">
+            <a href="/pages/scenarios/{{ scenario.id }}/categories/new"
+               class="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 dark:hover:bg-green-800 transition-colors">
+                <i class="fas fa-plus mr-2"></i> Добавить критерий
+            </a>
+            <button onclick="showDeleteModal()"
+                    class="bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700 dark:hover:bg-red-800 transition-colors">
+                <i class="fas fa-trash mr-2"></i> Удалить
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Основная информация -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Форма редактирования сценария -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Основные параметры</h2>
+            <form id="scenarioForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Код сценария *
+                        </label>
+                        <input type="text" id="code" name="code" required
+                               value="{{ scenario.code }}"
+                               class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Название *
+                        </label>
+                        <input type="text" id="name" name="name" required
+                               value="{{ scenario.name }}"
+                               class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Описание
+                    </label>
+                    <textarea id="description" name="description" rows="3"
+                              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{{ scenario.description or '' }}</textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Промт для ИИ *
+                    </label>
+                    <textarea id="prompt" name="prompt" rows="12" required
+                              class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm prompt-editor bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">{{ scenario.prompt }}</textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Порядок сортировки
+                        </label>
+                        <input type="number" id="sort_order" name="sort_order"
+                               value="{{ scenario.sort_order }}"
+                               class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    </div>
+
+                    <div class="flex items-center">
+                        <input type="checkbox" id="is_active" name="is_active"
+                               {% if scenario.is_active %}checked{% endif %}
+                               class="h-4 w-4 text-primary-600 dark:text-dark-500 focus:ring-primary-500 dark:focus:ring-dark-500 border-gray-300 dark:border-gray-600 rounded">
+                        <label for="is_active" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Активен</label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="submit"
+                            class="bg-primary-600 dark:bg-dark-600 text-white px-4 py-2 rounded-md text-sm hover:bg-primary-700 dark:hover:bg-dark-700 transition-colors">
+                        Сохранить изменения
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Боковая панель с категориями -->
+    <div class="space-y-6">
+        <!-- Статистика -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Статистика</h2>
+            <div class="space-y-3">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Количество критериев</p>
+                    <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                        {{ scenario.categories|length if scenario.categories else 0 }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Создан</p>
+                    <p class="text-sm text-gray-900 dark:text-gray-300">
+                        {{ scenario.created_at.strftime('%d.%m.%Y %H:%M') if scenario.created_at else 'Не указано' }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Обновлен</p>
+                    <p class="text-sm text-gray-900 dark:text-gray-300">
+                        {{ scenario.updated_at.strftime('%d.%m.%Y %H:%M') if scenario.updated_at else 'Не указано' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Список категорий -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Критерии оценки</h2>
+
+            {% if scenario.categories %}
+            <div class="space-y-3">
+                {% for category in scenario.categories %}
+                <div class="border border-gray-200 dark:border-gray-700 rounded p-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ category.title }}</h4>
+                            {% if category.description %}
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ category.description }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="flex space-x-2">
+                            <a href="/pages/scenarios/{{ scenario.id }}/categories/{{ category.id }}/edit"
+                               class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors text-sm">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button onclick="deleteCategory({{ scenario.id }}, {{ category.id }}, '{{ category.title }}')"
+                                    class="text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 transition-colors text-sm">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="mr-4">Вес: {{ category.weight }}</span>
+                        <span class="mr-4">Порядок: {{ category.sort_order }}</span>
+                        <span class="{% if category.is_active %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                            {% if category.is_active %}Активен{% else %}Неактивен{% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 dark:text-gray-400 text-sm italic">Критерии не добавлены</p>
+            {% endif %}
+
+            <div class="mt-4 text-center">
+                <a href="/pages/scenarios/{{ scenario.id }}/categories/new"
+                   class="text-primary-600 dark:text-dark-500 hover:text-primary-800 dark:hover:text-dark-400 transition-colors text-sm font-medium">
+                    <i class="fas fa-plus mr-1"></i> Добавить критерий
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно удаления -->
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white dark:bg-gray-800 transition-colors">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4">Удалить сценарий</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Вы уверены, что хотите удалить сценарий "{{ scenario.name }}"?
+                Все связанные критерии также будут удалены.
+            </p>
+
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeDeleteModal()"
+                        class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Отмена
+                </button>
+                <button type="button" onclick="confirmDeleteScenario()"
+                        class="bg-red-600 dark:bg-red-700 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700 dark:hover:bg-red-800 transition-colors">
+                    Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Сохранение изменений сценария
+document.getElementById('scenarioForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const data = {
+        code: formData.get('code'),
+        name: formData.get('name'),
+        description: formData.get('description') || null,
+        prompt: formData.get('prompt'),
+        sort_order: parseInt(formData.get('sort_order')) || 0,
+        is_active: formData.get('is_active') === 'on'
+    };
+
+    try {
+        const response = await fetch('/scenarios/{{ scenario.id }}', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            alert('Изменения сохранены');
+            window.location.reload();
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка при сохранении');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+});
+
+// Удаление категории
+async function deleteCategory(scenarioId, categoryId, categoryName) {
+    if (!confirm(`Удалить критерий "${categoryName}"?`)) return;
+
+    try {
+        const response = await fetch(`/scenarios/${scenarioId}/categories/${categoryId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка удаления');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+    }
+}
+
+// Удаление сценария
+function showDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+}
+
+async function confirmDeleteScenario() {
+    try {
+        const response = await fetch('/scenarios/{{ scenario.id }}', {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            window.location.href = '/pages/scenarios';
+        } else {
+            const result = await response.json();
+            alert(result.detail || 'Ошибка удаления');
+            closeDeleteModal();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка соединения');
+        closeDeleteModal();
+    }
+}
+
+// Закрытие модального окна при клике вне его
+window.onclick = function(event) {
+    const modal = document.getElementById('deleteModal');
+    if (event.target === modal) {
+        closeDeleteModal();
+    }
+}
+</script>
+{% endblock %}

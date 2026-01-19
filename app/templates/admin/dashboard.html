@@ -1,0 +1,115 @@
+<!-- file name: admin/dashboard.html -->
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Админ-панель</h1>
+</div>
+
+<!-- Статистика -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0 bg-primary-100 p-3 rounded-md">
+                <i class="fas fa-phone text-primary-600 text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Всего звонков</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ stats.total_calls }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0 bg-green-100 p-3 rounded-md">
+                <i class="fas fa-user-tie text-green-600 text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Клиенты</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ stats.total_clients }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0 bg-purple-100 p-3 rounded-md">
+                <i class="fas fa-users text-purple-600 text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">МОПы</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ stats.total_mops }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0 bg-yellow-100 p-3 rounded-md">
+                <i class="fas fa-user text-yellow-600 text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Пользователи</p>
+                <p class="text-2xl font-semibold text-gray-900">{{ stats.total_users }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Последние звонки -->
+<div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Последние звонки</h2>
+    <div class="overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Клиент</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for call in recent_calls %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ call.id }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">
+                            {% if call.client_id %}
+                            Клиент #{{ call.client_id }}
+                            {% else %}
+                            Не указан
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% set status_colors = {
+                            'transcribing': 'bg-blue-100 text-blue-800',
+                            'transcription_done': 'bg-yellow-100 text-yellow-800',
+                            'analyzing': 'bg-purple-100 text-purple-800',
+                            'analyzing_done': 'bg-green-100 text-green-800',
+                            'analyzing_error': 'bg-red-100 text-red-800'
+                        } %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ status_colors.get(call.status, 'bg-gray-100 text-gray-800') }}">
+                            {{ call.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ call.created_at.strftime('%d.%m.%Y %H:%M') if call.created_at else '' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                        Звонки не найдены
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
