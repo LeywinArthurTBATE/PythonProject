@@ -1,0 +1,1121 @@
+<!-- app/templates/analytics/tokens.html -->
+{% extends "layout.html" %}
+
+{% block title %}Аналитика токенов и расходов{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Аналитика токенов и расходов</h1>
+    <p class="text-gray-600 dark:text-gray-400 mt-2">
+        Мониторинг использования LLM API и расходов на токены
+    </p>
+</div>
+
+<!-- Фильтры -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Фильтры</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <!-- Период -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Период
+            </label>
+            <select id="periodSelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="1h">Последний час</option>
+                <option value="6h">Последние 6 часов</option>
+                <option value="12h">Последние 12 часов</option>
+                <option value="1d" selected>Последние 24 часа</option>
+                <option value="7d">Последняя неделя</option>
+                <option value="30d">Последний месяц</option>
+                <option value="365d">Последний год</option>
+                <option value="custom">Произвольный период</option>
+            </select>
+        </div>
+
+        <!-- Группировка -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Группировка по времени
+            </label>
+            <select id="groupBySelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="hour">По часам</option>
+                <option value="day" selected>По дням</option>
+                <option value="week">По неделям</option>
+                <option value="month">По месяцам</option>
+            </select>
+        </div>
+
+        <!-- Провайдер -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Провайдер
+            </label>
+            <select id="providerSelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="">Все провайдеры</option>
+                {% for provider in providers %}
+                <option value="{{ provider }}">{{ provider }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Модель -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Модель
+            </label>
+            <select id="modelSelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <option value="">Все модели</option>
+                {% for model in models %}
+                <option value="{{ model }}">{{ model }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Произвольный период -->
+    <div id="customPeriodContainer" class="hidden mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Начальная дата
+            </label>
+            <input type="datetime-local" id="startDateInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Конечная дата
+            </label>
+            <input type="datetime-local" id="endDateInput" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+        </div>
+    </div>
+
+    <!-- Кнопки действий -->
+    <div class="mt-6 flex justify-between">
+        <button onclick="applyFilters()" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors flex items-center">
+            <i class="fas fa-filter mr-2"></i> Применить фильтры
+        </button>
+
+        <div class="flex space-x-3">
+            <button onclick="exportData()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center">
+                <i class="fas fa-file-export mr-2"></i> Экспорт
+            </button>
+
+            <div class="relative">
+                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center">
+                    <i class="fas fa-sync-alt mr-2"></i> Автообновление: <span id="autoRefreshStatus">ВКЛ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Основная статистика -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+    <!-- Всего токенов -->
+    <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+        <div class="flex items-center mb-4">
+            <div class="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 mr-3">
+                <i class="fas fa-hashtag text-blue-600 dark:text-blue-400"></i>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Всего токенов</p>
+                <h3 id="totalTokens" class="text-2xl font-bold text-gray-900 dark:text-gray-100">0</h3>
+            </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-500">
+            <span id="totalPromptTokens">0</span> prompt +
+            <span id="totalCompletionTokens">0</span> completion
+        </div>
+    </div>
+
+    <!-- Всего запросов -->
+    <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 rounded-xl p-6 border border-green-200 dark:border-green-800">
+        <div class="flex items-center mb-4">
+            <div class="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 mr-3">
+                <i class="fas fa-exchange-alt text-green-600 dark:text-green-400"></i>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Всего запросов</p>
+                <h3 id="totalRequests" class="text-2xl font-bold text-gray-900 dark:text-gray-100">0</h3>
+            </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-500">
+            <span id="avgTokensPerRequest">0</span> токенов в среднем
+        </div>
+    </div>
+
+    <!-- Стоимость -->
+    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-900/10 rounded-xl p-6 border border-yellow-200 dark:border-yellow-800">
+        <div class="flex items-center mb-4">
+            <div class="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 mr-3">
+                <i class="fas fa-dollar-sign text-yellow-600 dark:text-yellow-400"></i>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Общая стоимость</p>
+                <h3 id="totalCost" class="text-2xl font-bold text-gray-900 dark:text-gray-100">$0.00</h3>
+            </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-500">
+            <span id="costPer1kTokens">$0.00</span> за 1K токенов
+        </div>
+    </div>
+
+    <!-- Период -->
+    <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+        <div class="flex items-center mb-4">
+            <div class="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 mr-3">
+                <i class="fas fa-calendar-alt text-purple-600 dark:text-purple-400"></i>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Период</p>
+                <h3 id="periodDisplay" class="text-lg font-bold text-gray-900 dark:text-gray-100">24 часа</h3>
+            </div>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-500" id="dateRangeDisplay">
+            ...
+        </div>
+    </div>
+</div>
+
+<!-- Графики -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- График использования токенов -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Использование токенов</h2>
+            <div class="flex space-x-2">
+                <button onclick="toggleChartStacked('tokensChart')" class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    Стек/группа
+                </button>
+                <button onclick="downloadChart('tokensChart')" class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+        </div>
+        <div id="tokensChart"></div>
+    </div>
+
+    <!-- Распределение по провайдерам -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Распределение по провайдерам</h2>
+            <button onclick="downloadChart('providersChart')" class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+        <div id="providersChart"></div>
+    </div>
+</div>
+
+<!-- Таблицы -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- По моделям -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-6">Использование по моделям</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th class="px-4 py-3">Модель</th>
+                        <th class="px-4 py-3">Токены</th>
+                        <th class="px-4 py-3">Запросы</th>
+                        <th class="px-4 py-3">Среднее</th>
+                    </tr>
+                </thead>
+                <tbody id="modelsTableBody">
+                    <!-- Заполнится через JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- По эндпоинтам -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-6">Использование по эндпоинтам</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th class="px-4 py-3">Эндпоинт</th>
+                        <th class="px-4 py-3">Токены</th>
+                        <th class="px-4 py-3">Запросы</th>
+                        <th class="px-4 py-3">% от общего</th>
+                    </tr>
+                </thead>
+                <tbody id="endpointsTableBody">
+                    <!-- Заполнится через JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Детализация запросов -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Детализация запросов</h2>
+        <div class="flex items-center space-x-3">
+            <select id="detailsPageSize" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+            <button onclick="refreshDetails()" class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                    <th class="px-4 py-3">Дата</th>
+                    <th class="px-4 py-3">Провайдер</th>
+                    <th class="px-4 py-3">Модель</th>
+                    <th class="px-4 py-3">Эндпоинт</th>
+                    <th class="px-4 py-3">Токены</th>
+                    <th class="px-4 py-3">Стоимость</th>
+                    <th class="px-4 py-3">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="detailsTableBody">
+                <!-- Заполнится через JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Пагинация -->
+    <div class="mt-6 flex justify-between items-center">
+        <div class="text-sm text-gray-600 dark:text-gray-400" id="detailsPaginationInfo">
+            Показано 0 из 0 записей
+        </div>
+        <div class="flex space-x-2" id="detailsPagination">
+            <!-- Пагинация появится через JS -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Состояние приложения
+const state = {
+    period: '1d',
+    groupBy: 'day',
+    provider: '',
+    model: '',
+    startDate: null,
+    endDate: null,
+    autoRefresh: true,
+    autoRefreshInterval: null,
+    detailsPage: 1,
+    detailsPageSize: 20,
+    detailsTotal: 0,
+    detailsPages: 1
+};
+
+// Элементы DOM
+let tokensChart = null;
+let providersChart = null;
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDateInputs();
+    setupEventListeners();
+    loadData();
+    startAutoRefresh();
+});
+
+function isDarkMode() {
+    return document.documentElement.classList.contains('dark');
+}
+
+function initializeDateInputs() {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Форматируем даты для input[type=datetime-local]
+    function formatForInput(date) {
+        return date.toISOString().slice(0, 16);
+    }
+
+    document.getElementById('startDateInput').value = formatForInput(yesterday);
+    document.getElementById('endDateInput').value = formatForInput(now);
+}
+
+function setupEventListeners() {
+    // Событие выбора периода
+    document.getElementById('periodSelect').addEventListener('change', function() {
+        const customContainer = document.getElementById('customPeriodContainer');
+        if (this.value === 'custom') {
+            customContainer.classList.remove('hidden');
+        } else {
+            customContainer.classList.add('hidden');
+        }
+    });
+
+    // Событие изменения размера страницы детализации
+    document.getElementById('detailsPageSize').addEventListener('change', function() {
+        state.detailsPageSize = parseInt(this.value);
+        state.detailsPage = 1;
+        loadUsageDetails();
+    });
+}
+
+// Загрузка всех данных
+async function loadData() {
+    try {
+        await Promise.all([
+            loadOverview(),
+            loadTimeSeries(),
+            loadByProvider(),
+            loadByModel(),
+            loadByEndpoint(),
+            loadCosts(),
+            loadUsageDetails()
+        ]);
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('Ошибка загрузки данных', 'error');
+    }
+}
+
+// Общая статистика
+async function loadOverview() {
+    const params = new URLSearchParams({
+        period: state.period,
+        provider: state.provider,
+        model: state.model
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/overview?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Обновляем UI
+    document.getElementById('totalTokens').textContent =
+        data.total_tokens.toLocaleString();
+    document.getElementById('totalPromptTokens').textContent =
+        data.total_prompt_tokens.toLocaleString();
+    document.getElementById('totalCompletionTokens').textContent =
+        data.total_completion_tokens.toLocaleString();
+    document.getElementById('totalRequests').textContent =
+        data.total_requests.toLocaleString();
+    document.getElementById('avgTokensPerRequest').textContent =
+        Math.round(data.avg_tokens_per_request).toLocaleString();
+
+    // Обновляем отображение периода
+    updatePeriodDisplay(data);
+}
+
+// Временные ряды
+async function loadTimeSeries() {
+    const dark = document.documentElement.classList.contains('dark');
+    const textColor = dark ? '#E5E7EB' : '#374151';
+    const gridColor = dark ? '#374151' : '#E5E7EB';
+
+    const params = new URLSearchParams({
+        period: state.period,
+        group_by: state.groupBy,
+        provider: state.provider
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/time-series?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (tokensChart) {
+        tokensChart.destroy();
+        tokensChart = null;
+    }
+
+    tokensChart = new ApexCharts(document.querySelector("#tokensChart"), {
+        series: [
+            { name: 'Prompt токены', data: data.data.map(d => d.prompt_tokens) },
+            { name: 'Completion токены', data: data.data.map(d => d.completion_tokens) },
+            { name: 'Всего токенов', data: data.data.map(d => d.total_tokens) }
+        ],
+
+        chart: {
+            type: 'area',
+            height: 350,
+            stacked: false,
+            foreColor: textColor,
+
+            // 🔥 КЛЮЧЕВО — выключаем toolbar ApexCharts
+            toolbar: {
+                show: false
+            },
+
+            zoom: {
+                enabled: true
+            }
+        },
+
+        dataLabels: { enabled: false },
+        stroke: { curve: 'smooth', width: 2 },
+
+        fill: {
+            type: 'gradient',
+            gradient: { opacityFrom: 0.6, opacityTo: 0.1 }
+        },
+
+        xaxis: {
+            categories: data.data.map(d => d.timestamp_formatted),
+            labels: {
+                rotate: -45,
+                style: { colors: textColor }
+            }
+        },
+
+        yaxis: {
+            title: {
+                text: 'Количество токенов',
+                style: { color: textColor }
+            },
+            labels: {
+                style: { colors: textColor },
+                formatter: val => val.toLocaleString()
+            }
+        },
+
+        legend: {
+            position: 'top',
+            horizontalAlign: 'center',
+            labels: { colors: textColor }
+        },
+
+        grid: {
+            borderColor: gridColor
+        },
+
+        tooltip: {
+            theme: dark ? 'dark' : 'light',
+            y: {
+                formatter: val => val.toLocaleString() + ' токенов'
+            }
+        },
+
+        colors: ['#3B82F6', '#10B981', '#8B5CF6']
+    });
+
+    tokensChart.render();
+}
+
+// По провайдерам
+async function loadByProvider() {
+    const dark = document.documentElement.classList.contains('dark');
+
+    const textColor = dark ? '#E5E7EB' : '#374151';
+
+    const params = new URLSearchParams({
+        period: state.period
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/by-provider?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (providersChart) {
+        providersChart.destroy();
+        providersChart = null;
+    }
+
+    providersChart = new ApexCharts(document.querySelector("#providersChart"), {
+        series: data.data.map(d => d.total_tokens),
+        labels: data.data.map(d => d.provider),
+        chart: {
+            type: 'donut',
+            height: 350,
+            foreColor: textColor
+        },
+        legend: {
+            position: 'bottom',
+            labels: { colors: textColor }
+        },
+        plotOptions: {
+            pie: {
+                donut: {
+                    size: '65%',
+                    labels: {
+                        show: true,
+                        name: { color: textColor },
+                        value: { color: textColor },
+                        total: {
+                            show: true,
+                            label: 'Всего токенов',
+                            color: textColor,
+                            formatter: w =>
+                                w.globals.seriesTotals
+                                    .reduce((a, b) => a + b, 0)
+                                    .toLocaleString()
+                        }
+                    }
+                }
+            }
+        },
+        dataLabels: {
+            formatter: (val) => val.toFixed(1) + '%'
+        },
+        tooltip: {
+            theme: dark ? 'dark' : 'light',
+            y: {
+                formatter: val => val.toLocaleString() + ' токенов'
+            }
+        },
+        colors: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#6366F1']
+    });
+
+    providersChart.render();
+}
+
+// По моделям
+async function loadByModel() {
+    const params = new URLSearchParams({
+        period: state.period,
+        provider: state.provider
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/by-model?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Обновляем таблицу
+    const tbody = document.getElementById('modelsTableBody');
+    tbody.innerHTML = '';
+
+    data.data.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+
+        row.innerHTML = `
+            <td class="px-4 py-3">
+                <div class="font-medium text-gray-900 dark:text-gray-100">${item.model || 'Unknown'}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-500">${item.provider}</div>
+            </td>
+            <td class="px-4 py-3">
+                <div class="font-medium">${item.total_tokens.toLocaleString()}</div>
+                <div class="text-xs text-gray-500">
+                    ${item.total_prompt_tokens.toLocaleString()}p + ${item.total_completion_tokens.toLocaleString()}c
+                </div>
+            </td>
+            <td class="px-4 py-3">${item.request_count.toLocaleString()}</td>
+            <td class="px-4 py-3">${Math.round(item.avg_tokens_per_request).toLocaleString()}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+// По эндпоинтам
+async function loadByEndpoint() {
+    const params = new URLSearchParams({
+        period: state.period
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/by-endpoint?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Обновляем таблицу
+    const tbody = document.getElementById('endpointsTableBody');
+    tbody.innerHTML = '';
+
+    data.data.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+
+        row.innerHTML = `
+            <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">${item.endpoint}</td>
+            <td class="px-4 py-3">${item.total_tokens.toLocaleString()}</td>
+            <td class="px-4 py-3">${item.request_count.toLocaleString()}</td>
+            <td class="px-4 py-3">
+                <div class="flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700 mr-2">
+                        <div class="bg-primary-600 h-2 rounded-full" style="width: ${item.percentage}%"></div>
+                    </div>
+                    <span>${item.percentage.toFixed(1)}%</span>
+                </div>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+// Стоимость
+async function loadCosts() {
+    const params = new URLSearchParams({
+        period: state.period
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/costs/overview?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Обновляем UI
+    document.getElementById('totalCost').textContent =
+        `$${data.total_cost.toFixed(2)}`;
+    document.getElementById('costPer1kTokens').textContent =
+        `$${data.cost_per_1k_tokens.toFixed(4)}`;
+}
+
+// Детализация запросов
+async function loadUsageDetails() {
+    const params = new URLSearchParams({
+        period: state.period,
+        page: state.detailsPage,
+        size: state.detailsPageSize,
+        provider: state.provider,
+        model: state.model
+    });
+
+    if (state.period === 'custom' && state.startDate && state.endDate) {
+        params.append('start_date', state.startDate.toISOString());
+        params.append('end_date', state.endDate.toISOString());
+    }
+
+    const response = await fetch(`/analytics/tokens/usage-details?${params}`, {
+        credentials: 'include'
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Сохраняем данные пагинации
+    state.detailsTotal = data.total;
+    state.detailsPages = data.pages;
+
+    // Обновляем таблицу
+    const tbody = document.getElementById('detailsTableBody');
+    tbody.innerHTML = '';
+
+    data.items.forEach(item => {
+        const row = document.createElement('tr');
+        row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600';
+
+        const date = new Date(item.created_at);
+        const dateStr = date.toLocaleString('ru-RU');
+
+        row.innerHTML = `
+            <td class="px-4 py-3 text-gray-900 dark:text-gray-300">${dateStr}</td>
+            <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    ${item.provider}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-gray-900 dark:text-gray-300">${item.model || '-'}</td>
+            <td class="px-4 py-3">
+                <code class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">${item.endpoint}</code>
+            </td>
+            <td class="px-4 py-3">
+                <div class="font-medium">${item.total_tokens.toLocaleString()}</div>
+                <div class="text-xs text-gray-500">
+                    ${item.prompt_tokens.toLocaleString()}p + ${item.completion_tokens.toLocaleString()}c
+                </div>
+            </td>
+            <td class="px-4 py-3">
+                ${item.cost_usd ? `$${item.cost_usd.toFixed(4)}` : '-'}
+            </td>
+            <td class="px-4 py-3">
+                ${item.call_analysis_id ?
+                    `<a href="/pages/calls/${item.call_analysis_id}" class="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>` :
+                    '-'
+                }
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
+
+    // Обновляем пагинацию
+    updateDetailsPagination();
+}
+
+function updateDetailsPagination() {
+    const info = document.getElementById('detailsPaginationInfo');
+    const pagination = document.getElementById('detailsPagination');
+
+    const start = (state.detailsPage - 1) * state.detailsPageSize + 1;
+    const end = Math.min(state.detailsPage * state.detailsPageSize, state.detailsTotal);
+
+    info.textContent = `Показано ${start}-${end} из ${state.detailsTotal.toLocaleString()} записей`;
+
+    // Создаем кнопки пагинации
+    pagination.innerHTML = '';
+
+    // Кнопка "Назад"
+    const prevButton = document.createElement('button');
+    prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prevButton.className = `px-3 py-1 rounded ${
+        state.detailsPage > 1
+            ? 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+    }`;
+    prevButton.disabled = state.detailsPage <= 1;
+    prevButton.addEventListener('click', () => {
+        if (state.detailsPage > 1) {
+            state.detailsPage--;
+            loadUsageDetails();
+        }
+    });
+    pagination.appendChild(prevButton);
+
+    // Номера страниц
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, state.detailsPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(state.detailsPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        pageButton.className = `px-3 py-1 mx-1 rounded ${
+            i === state.detailsPage
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+        }`;
+        pageButton.addEventListener('click', () => {
+            state.detailsPage = i;
+            loadUsageDetails();
+        });
+        pagination.appendChild(pageButton);
+    }
+
+    // Кнопка "Вперед"
+    const nextButton = document.createElement('button');
+    nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    nextButton.className = `px-3 py-1 rounded ${
+        state.detailsPage < state.detailsPages
+            ? 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+    }`;
+    nextButton.disabled = state.detailsPage >= state.detailsPages;
+    nextButton.addEventListener('click', () => {
+        if (state.detailsPage < state.detailsPages) {
+            state.detailsPage++;
+            loadUsageDetails();
+        }
+    });
+    pagination.appendChild(nextButton);
+}
+
+function updatePeriodDisplay(data) {
+    const periodSelect = document.getElementById('periodSelect');
+    const periodText = periodSelect.options[periodSelect.selectedIndex].text;
+
+    document.getElementById('periodDisplay').textContent = periodText;
+
+    if (data.start_date && data.end_date) {
+        const start = new Date(data.start_date);
+        const end = new Date(data.end_date);
+
+        const formatDate = (date) => {
+            return date.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        };
+
+        document.getElementById('dateRangeDisplay').textContent =
+            `${formatDate(start)} — ${formatDate(end)}`;
+    }
+}
+
+function applyFilters() {
+    // Собираем значения фильтров
+    state.period = document.getElementById('periodSelect').value;
+    state.groupBy = document.getElementById('groupBySelect').value;
+    state.provider = document.getElementById('providerSelect').value || '';
+    state.model = document.getElementById('modelSelect').value || '';
+
+    if (state.period === 'custom') {
+        const startInput = document.getElementById('startDateInput').value;
+        const endInput = document.getElementById('endDateInput').value;
+
+        if (startInput && endInput) {
+            state.startDate = new Date(startInput);
+            state.endDate = new Date(endInput);
+        }
+    } else {
+        state.startDate = null;
+        state.endDate = null;
+    }
+
+    // Сбрасываем страницу детализации
+    state.detailsPage = 1;
+
+    // Загружаем данные с новыми фильтрами
+    loadData();
+
+    showNotification('Фильтры применены', 'success');
+}
+
+function refreshDetails() {
+    loadUsageDetails();
+    showNotification('Детализация обновлена', 'info');
+}
+
+function toggleAutoRefresh() {
+    state.autoRefresh = !state.autoRefresh;
+    const statusSpan = document.getElementById('autoRefreshStatus');
+    const button = document.getElementById('autoRefreshBtn');
+
+    if (state.autoRefresh) {
+        statusSpan.textContent = 'ВКЛ';
+        button.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        startAutoRefresh();
+        showNotification('Автообновление включено', 'success');
+    } else {
+        statusSpan.textContent = 'ВЫКЛ';
+        button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        button.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        stopAutoRefresh();
+        showNotification('Автообновление выключено', 'info');
+    }
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh(); // Останавливаем предыдущий интервал
+
+    if (state.autoRefresh) {
+        state.autoRefreshInterval = setInterval(() => {
+            loadData();
+            console.log('Auto-refresh triggered');
+        }, 15000); // 15 секунд
+    }
+}
+
+function stopAutoRefresh() {
+    if (state.autoRefreshInterval) {
+        clearInterval(state.autoRefreshInterval);
+        state.autoRefreshInterval = null;
+    }
+}
+
+function toggleChartStacked(chartId) {
+    if (chartId === 'tokensChart' && tokensChart) {
+        const isStacked = tokensChart.opts.chart.stacked;
+        tokensChart.updateOptions({
+            chart: {
+                stacked: !isStacked
+            }
+        });
+    }
+}
+
+function downloadChart(chartId) {
+    let chart;
+    let filename;
+
+    if (chartId === 'tokensChart' && tokensChart) {
+        chart = tokensChart;
+        filename = 'tokens_usage_chart';
+    } else if (chartId === 'providersChart' && providersChart) {
+        chart = providersChart;
+        filename = 'providers_distribution_chart';
+    } else {
+        return;
+    }
+
+    chart.dataURI().then((uri) => {
+        const link = document.createElement('a');
+        link.download = `${filename}_${new Date().toISOString().slice(0,10)}.png`;
+        link.href = uri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
+
+async function exportData() {
+    try {
+        const params = new URLSearchParams({
+            period: state.period,
+            provider: state.provider,
+            model: state.model
+        });
+
+        if (state.period === 'custom' && state.startDate && state.endDate) {
+            params.append('start_date', state.startDate.toISOString());
+            params.append('end_date', state.endDate.toISOString());
+        }
+
+        const response = await fetch(`/analytics/tokens/usage-details?${params}&size=1000`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Конвертируем в CSV
+        const headers = ['Дата', 'Провайдер', 'Модель', 'Эндпоинт', 'Prompt токены', 'Completion токены', 'Всего токенов', 'Стоимость USD', 'ID запроса'];
+        const rows = data.items.map(item => [
+            new Date(item.created_at).toLocaleString('ru-RU'),
+            item.provider,
+            item.model || '',
+            item.endpoint,
+            item.prompt_tokens,
+            item.completion_tokens,
+            item.total_tokens,
+            item.cost_usd || '',
+            item.request_id || ''
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Создаем и скачиваем файл
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', `llm_usage_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification('Данные успешно экспортированы', 'success');
+
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Ошибка экспорта данных', 'error');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 ${
+        type === 'success' ? 'bg-green-100 border-green-400 text-green-800' :
+        type === 'error' ? 'bg-red-100 border-red-400 text-red-800' :
+        'bg-blue-100 border-blue-400 text-blue-800'
+    } border`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${
+                type === 'success' ? 'fa-check-circle' :
+                type === 'error' ? 'fa-exclamation-circle' :
+                'fa-info-circle'
+            } mr-3"></i>
+            <span>${message}</span>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+document.addEventListener('themeChanged', () => {
+    if (tokensChart) tokensChart.destroy();
+    if (providersChart) providersChart.destroy();
+    tokensChart = null;
+    providersChart = null;
+    loadTimeSeries();
+    loadByProvider();
+});
+
+// Очищаем интервал при уходе со страницы
+window.addEventListener('beforeunload', function() {
+    stopAutoRefresh();
+});
+</script>
+{% endblock %}
